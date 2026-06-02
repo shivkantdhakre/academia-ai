@@ -1,49 +1,60 @@
 'use client';
 
+import React from 'react';
 import { Course } from '@/types/database.types';
 import * as Icons from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface CourseGridProps {
   courses: Course[];
 }
 
-// Framer Motion container variants for staggered child entrance
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-    },
-  },
-};
-
-// Framer Motion child card variants with custom spring physics
-const cardVariants = {
-  hidden: { 
-    opacity: 0, 
-    y: 20 
-  },
-  show: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      type: 'spring',
-      stiffness: 300,
-      damping: 20,
-    } as const
-  },
-};
-
-// Physics spring config for interactive states (hover/progress loading)
-const springTransition = {
-  type: 'spring',
-  stiffness: 300,
-  damping: 20,
-} as const;
+type IconName = keyof typeof Icons;
 
 export function CourseGrid({ courses }: CourseGridProps) {
+  const shouldReduceMotion = useReducedMotion();
+
+  // Framer Motion container variants for staggered child entrance
+  const activeContainerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: shouldReduceMotion ? 0 : 0.08,
+      },
+    },
+  };
+
+  // Framer Motion child card variants with custom spring physics
+  const activeCardVariants = {
+    hidden: { 
+      opacity: 0, 
+      y: shouldReduceMotion ? 0 : 20 
+    },
+    show: { 
+      opacity: 1, 
+      y: 0,
+      transition: shouldReduceMotion 
+        ? { duration: 0.1 } 
+        : {
+            type: 'spring' as const,
+            stiffness: 300,
+            damping: 20,
+          }
+    },
+  };
+
+  // Physics spring config for interactive states (hover/progress loading)
+  const activeTransition = shouldReduceMotion 
+    ? { duration: 0.1 } 
+    : {
+        type: 'spring' as const,
+        stiffness: 300,
+        damping: 20,
+      };
+
+  const hoverAnimation = shouldReduceMotion ? {} : { scale: 1.015, y: -2 };
+
   if (courses.length === 0) {
     return (
       <section className="flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-[#09090b]/40 p-12 text-center">
@@ -58,14 +69,15 @@ export function CourseGrid({ courses }: CourseGridProps) {
 
   return (
     <motion.section 
-      variants={containerVariants}
+      variants={activeContainerVariants}
       initial="hidden"
       animate="show"
       className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[220px]"
     >
       {courses.map((course, idx) => {
         // Dynamically resolve the Lucide icon, fallback to BookOpen if not found
-        const IconComponent = (Icons as any)[course.icon_name] || Icons.BookOpen;
+        const iconKey = course.icon_name as IconName;
+        const IconComponent = (Icons[iconKey] as React.ElementType) || Icons.BookOpen;
 
         // Bento grid spans
         const isFeatured = idx === 0;
@@ -76,18 +88,20 @@ export function CourseGrid({ courses }: CourseGridProps) {
         return (
           <motion.article
             key={course.id}
-            variants={cardVariants}
-            whileHover={{ scale: 1.015, y: -2 }}
-            transition={springTransition}
+            variants={activeCardVariants}
+            whileHover={hoverAnimation}
+            transition={activeTransition}
             className={`rounded-3xl border border-white/5 bg-[#09090b]/40 p-6 flex flex-col justify-between relative overflow-hidden group hover:border-indigo-500/30 transition-colors duration-300 cursor-pointer ${gridSpan}`}
           >
             {/* Subtle animated border glow backdrop */}
-            <motion.div 
-              className="absolute -inset-px bg-gradient-to-br from-indigo-500/10 via-transparent to-purple-500/10 pointer-events-none rounded-3xl"
-              initial={{ opacity: 0 }}
-              whileHover={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-            />
+            {!shouldReduceMotion && (
+              <motion.div 
+                className="absolute -inset-px bg-gradient-to-br from-indigo-500/10 via-transparent to-purple-500/10 pointer-events-none rounded-3xl"
+                initial={{ opacity: 0 }}
+                whileHover={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
+            )}
 
             {/* Top row: Icon and Date */}
             <div className="relative z-10 flex items-start justify-between">
@@ -122,13 +136,20 @@ export function CourseGrid({ courses }: CourseGridProps) {
                   <span className="text-xs text-slate-400">Progress</span>
                   <span className="text-xs font-bold text-slate-200">{course.progress}%</span>
                 </div>
-                {/* Custom Gradient Progress Bar (uses scaleX & origin-left to prevent layout shifts) */}
-                <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                {/* Custom Gradient Progress Bar */}
+                <div 
+                  role="progressbar" 
+                  aria-valuenow={course.progress} 
+                  aria-valuemin={0} 
+                  aria-valuemax={100}
+                  aria-label={`${course.title} progress`}
+                  className="w-full bg-white/5 h-2 rounded-full overflow-hidden"
+                >
                   <motion.div
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 h-full rounded-full origin-left"
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: course.progress / 100 }}
-                    transition={{
+                    transition={shouldReduceMotion ? { duration: 0.1 } : {
                       type: 'spring',
                       stiffness: 300,
                       damping: 20,

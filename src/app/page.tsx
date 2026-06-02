@@ -13,6 +13,7 @@ export default async function Page() {
 
   if (error) {
     console.error('Failed to fetch courses:', error);
+    throw new Error('Failed to load dashboard data. Please try again later.');
   }
 
   return (

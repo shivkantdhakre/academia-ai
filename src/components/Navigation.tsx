@@ -37,6 +37,7 @@ export function Navigation() {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? 'page' : undefined}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors duration-200 group relative w-full justify-center lg:justify-start
                 ${isActive 
                   ? 'text-white' 
