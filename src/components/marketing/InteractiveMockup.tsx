@@ -39,10 +39,15 @@ export function InteractiveMockup() {
   const [isTyping, setIsTyping] = React.useState(false);
   const [typedText, setTypedText] = React.useState("");
 
-  const chatEndRef = React.useRef<HTMLDivElement>(null);
+  const chatContainerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
   }, [chatLog, isTyping, typedText]);
 
   const handleSelectPrompt = async (idx: number) => {
@@ -139,7 +144,7 @@ export function InteractiveMockup() {
             </div>
 
             {/* Chat Area */}
-            <div className="h-[420px] overflow-y-auto p-6 space-y-6 flex flex-col scrollbar-thin bg-card/20">
+            <div ref={chatContainerRef} className="h-[420px] overflow-y-auto p-6 space-y-6 flex flex-col scrollbar-thin bg-card/20">
               <AnimatePresence initial={false}>
                 {chatLog.map((msg, i) => (
                   <motion.div
@@ -215,7 +220,7 @@ export function InteractiveMockup() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              <div ref={chatEndRef} />
+
             </div>
 
             {/* Input Bar */}
