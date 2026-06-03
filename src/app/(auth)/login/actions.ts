@@ -42,7 +42,7 @@ export async function loginWithEmail(prevState: any, formData: FormData): Promis
     return { error: error.message };
   }
 
-  redirect('/');
+  redirect('/dashboard');
 }
 
 export async function signupWithEmail(prevState: any, formData: FormData): Promise<AuthActionResponse | undefined> {
@@ -74,7 +74,7 @@ export async function signupWithEmail(prevState: any, formData: FormData): Promi
 
   // Check if user is already confirmed (e.g. email confirmation disabled on Supabase)
   if (data?.session) {
-    redirect('/');
+    redirect('/dashboard');
   }
 
   return { success: 'Check your email for the confirmation link!' };

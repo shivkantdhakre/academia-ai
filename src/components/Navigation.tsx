@@ -6,7 +6,7 @@ import { LayoutDashboard, BookOpen, BarChart3, Settings, CreditCard } from 'luci
 import { motion } from 'framer-motion';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/courses', label: 'Courses', icon: BookOpen },
   { href: '/pricing', label: 'Pricing', icon: CreditCard },
   { href: '/analytics', label: 'Analytics', icon: BarChart3 },

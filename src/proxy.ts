@@ -27,7 +27,7 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // Refresh session if expired - required for Server Components to get correct user state
+  // Refresh session if expired
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -35,16 +35,19 @@ export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
 
   // Route protection rules:
-  // Allow assets, favicon, and login callback handler without auth
   const isAuthPage = url.pathname === '/login' || url.pathname.startsWith('/auth/');
+  const isPublicPage = url.pathname === '/'; // Allow public access to landing page
+  const isWebhook = url.pathname.startsWith('/api/webhooks/'); // Ensure Stripe/Razorpay webhooks aren't blocked
 
-  if (!user && !isAuthPage) {
+  // If no user, and they are trying to access a protected route
+  if (!user && !isAuthPage && !isPublicPage && !isWebhook) {
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  if (user && url.pathname === '/login') {
-    url.pathname = '/';
+  // If user is logged in, skip the login/landing pages and go straight to the app
+  if (user && (url.pathname === '/login' || url.pathname === '/')) {
+    url.pathname = '/dashboard';
     return NextResponse.redirect(url);
   }
 
@@ -53,13 +56,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (svg, png, jpg, etc.)
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

@@ -42,7 +42,7 @@ export default function PricingClient({ userEmail, userId }: PricingClientProps)
         },
         handler: function () {
           alert("Payment Successful! Your subscription is active.");
-          window.location.href = '/';
+          window.location.href = '/dashboard';
         },
         modal: {
           ondismiss: function() {
