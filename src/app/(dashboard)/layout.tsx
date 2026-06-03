@@ -21,7 +21,7 @@ export default async function DashboardLayout({
     .order('created_at', { ascending: true });
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex flex-col-reverse md:flex-row bg-[#030303] text-slate-100 font-sans">
+    <div className="dark h-screen w-screen overflow-hidden flex flex-col-reverse md:flex-row bg-[#030303] text-slate-100 font-sans">
       {/* Navigation Sidebar/Bottom Bar */}
       <Navigation />
 

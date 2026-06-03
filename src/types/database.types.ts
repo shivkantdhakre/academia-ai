@@ -24,6 +24,14 @@ export interface CourseMaterial {
   created_at: string; // timestamptz
 }
 
+export interface ContactSubmission {
+  id: string; // uuid, primary key
+  name: string; // text
+  email: string; // text
+  message: string; // text
+  created_at: string; // timestamp with time zone
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -50,6 +58,14 @@ export interface Database {
           metadata?: any;
         };
         Update: Partial<CourseMaterial>;
+      };
+      contact_submissions: {
+        Row: ContactSubmission;
+        Insert: Omit<ContactSubmission, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<ContactSubmission>;
       };
     };
   };
