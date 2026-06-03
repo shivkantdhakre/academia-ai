@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { google } from '@ai-sdk/google';
+import { google } from '@/utils/google';
 import { embed, streamText } from 'ai';
+
 import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
 
@@ -100,7 +101,7 @@ ${contextText}`;
 
     // 6. Stream completion using Vercel AI SDK & Google Gemini model
     const result = streamText({
-      model: google('gemini-1.5-flash'),
+      model: google('gemini-2.5-flash'),
       messages,
       system: systemPrompt,
       onFinish: async () => {

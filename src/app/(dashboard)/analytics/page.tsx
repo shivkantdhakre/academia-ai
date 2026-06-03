@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
 import { generateText } from 'ai';
-import { google } from '@ai-sdk/google';
+import { google } from '@/utils/google';
 import * as Icons from 'lucide-react';
+
 
 export const revalidate = 0; // Disable static caching to fetch fresh data and recommendations
 
@@ -51,7 +52,7 @@ export default async function AnalyticsPage() {
     const coursesListText = activeCourses.map(c => `- ${c.title}: ${c.progress}% progress`).join('\n');
     try {
       const response = await generateText({
-        model: google('gemini-1.5-flash'),
+        model: google('gemini-2.5-flash'),
         prompt: `You are a smart personal academic learning advisor. Analyze the progress of this student:
 Student Name: ${emailName}
 Courses list and progress:

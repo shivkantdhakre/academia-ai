@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { google } from '@ai-sdk/google';
+import { google } from '@/utils/google';
 import { generateObject, embed } from 'ai';
+
 import { z } from 'zod';
 import { createClient } from '@/utils/supabase/server';
 
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
 
     // 3. Call generateObject to structure the course syllabus outline and select icon
     const result = await generateObject({
-      model: google('gemini-1.5-flash'),
+      model: google('gemini-2.5-flash'),
       schema: z.object({
         title: z.string().describe("A professional, short, and catchy name for the course."),
         icon_name: z.string().describe("Name of a Lucide icon that matches the course topic. Choose from: 'Laptop', 'Brain', 'Cpu', 'Database', 'Sparkles', 'Globe', 'BookOpen', 'Code', 'Terminal', 'LineChart', 'Activity', 'Award', 'Layers', 'Workflow'."),
