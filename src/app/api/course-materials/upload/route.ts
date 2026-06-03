@@ -85,6 +85,11 @@ export async function POST(req: Request) {
       const { embedding } = await embed({
         model: google.textEmbeddingModel('gemini-embedding-2'),
         value: chunk,
+        providerOptions: {
+          google: {
+            outputDimensionality: 768,
+          },
+        },
       });
 
       materialsToInsert.push({

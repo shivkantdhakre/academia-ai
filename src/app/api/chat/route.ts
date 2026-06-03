@@ -76,6 +76,11 @@ export async function POST(req: Request) {
         const { embedding } = await embed({
           model: google.textEmbeddingModel('gemini-embedding-2'),
           value: latestMessage,
+          providerOptions: {
+            google: {
+              outputDimensionality: 768,
+            },
+          },
         });
 
         // Call database match function via RPC
