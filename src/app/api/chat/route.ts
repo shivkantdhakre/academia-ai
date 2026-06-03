@@ -5,6 +5,8 @@ import { embed, streamText } from 'ai';
 import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
 import { isRateLimited } from '@/utils/ratelimit';
 import * as Sentry from '@sentry/nextjs';
+import { revalidateTag } from 'next/cache';
+import { moderatePrompt } from '@/utils/moderation';
 
 
 export async function POST(req: Request) {
@@ -79,6 +81,16 @@ export async function POST(req: Request) {
     };
 
     const latestMessage = getMessageText(messages[messages.length - 1]);
+
+    // AI Moderation pre-flight check
+    const moderation = await moderatePrompt(latestMessage);
+    if (moderation.flagged) {
+      return NextResponse.json(
+        { error: `⚠️ Prompt flagged: ${moderation.reason || 'violates content safety policies'}.` },
+        { status: 400 }
+      );
+    }
+
     let contextText = 'No relevant course materials found.';
 
     try {
@@ -141,6 +153,7 @@ ${contextText}`;
           Sentry.captureException(deductError);
         } else {
           console.log(`Deducted 1 credit for user ${user.id} query.`);
+          (revalidateTag as any)(`profile-${user.id}`);
         }
       }
     });

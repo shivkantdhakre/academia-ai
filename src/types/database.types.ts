@@ -32,6 +32,15 @@ export interface ContactSubmission {
   created_at: string; // timestamp with time zone
 }
 
+export interface CourseMaterialsUpload {
+  id: string; // uuid, primary key
+  course_id: string; // uuid referencing courses
+  filename: string; // text
+  status: 'processing' | 'completed' | 'failed'; // text
+  error_message: string | null; // text
+  created_at: string; // timestamptz
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -66,6 +75,16 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<ContactSubmission>;
+      };
+      course_materials_uploads: {
+        Row: CourseMaterialsUpload;
+        Insert: Omit<CourseMaterialsUpload, 'id' | 'created_at' | 'status' | 'error_message'> & {
+          id?: string;
+          created_at?: string;
+          status?: 'processing' | 'completed' | 'failed';
+          error_message?: string | null;
+        };
+        Update: Partial<CourseMaterialsUpload>;
       };
     };
   };

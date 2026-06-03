@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
+import { revalidateTag } from 'next/cache';
 
 export async function POST(req: Request) {
   try {
@@ -63,6 +64,7 @@ export async function POST(req: Request) {
         }
         
         console.log(`Successfully upgraded user ${userId} to Pro tier.`);
+        (revalidateTag as any)(`profile-${userId}`);
       } else {
         console.warn('Subscription webhook payload missing user_id note:', subscription.id);
       }
@@ -117,6 +119,7 @@ export async function POST(req: Request) {
         }
 
         console.log(`Webhook Fallback: Successfully credited 100 AI credits to user ${userId} for order ${orderId} (New Total: ${newCredits}).`);
+        (revalidateTag as any)(`profile-${userId}`);
       } else {
         console.warn('Order paid event missing user_id note or order_id:', orderId);
       }

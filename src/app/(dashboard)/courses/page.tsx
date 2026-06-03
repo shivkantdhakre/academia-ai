@@ -1,20 +1,17 @@
 import { createClient } from '@/utils/supabase/server';
 import { CourseGrid } from '@/components/CourseGrid';
-
-export const revalidate = 0; // Disable static caching to fetch fresh database entries
+import { getCachedCourses } from '@/utils/cache';
+import { redirect } from 'next/navigation';
 
 export default async function CoursesPage() {
   const supabase = await createClient();
 
-  const { data: courses, error } = await supabase
-    .from('courses')
-    .select('*')
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    console.error('Failed to fetch courses:', error);
-    throw new Error('Failed to load courses. Please try again later.');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/login');
   }
+
+  const courses = await getCachedCourses(user.id);
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">

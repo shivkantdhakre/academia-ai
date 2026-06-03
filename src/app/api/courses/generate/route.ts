@@ -6,38 +6,11 @@ import { z } from 'zod';
 import { createClient } from '@/utils/supabase/server';
 import { isRateLimited } from '@/utils/ratelimit';
 import * as Sentry from '@sentry/nextjs';
+import { revalidateTag } from 'next/cache';
+import { moderatePrompt } from '@/utils/moderation';
+import { chunkText } from '@/utils/chunk';
 
-function chunkText(text: string, chunkSize: number = 800, overlap: number = 100): string[] {
-  const chunks: string[] = [];
-  if (!text) return chunks;
 
-  let startIndex = 0;
-  while (startIndex < text.length) {
-    let endIndex = startIndex + chunkSize;
-    
-    // Don't slice in the middle of a word; find the nearest space
-    if (endIndex < text.length) {
-      const spaceIndex = text.lastIndexOf(' ', endIndex);
-      if (spaceIndex > startIndex) {
-        endIndex = spaceIndex;
-      }
-    }
-    
-    const chunk = text.slice(startIndex, endIndex).trim();
-    if (chunk) {
-      chunks.push(chunk);
-    }
-    
-    // Move starting index back by the overlap amount (ensuring forward progress)
-    const nextIndex = endIndex - overlap;
-    if (nextIndex <= startIndex) {
-      startIndex = endIndex;
-    } else {
-      startIndex = nextIndex;
-    }
-  }
-  return chunks;
-}
 
 export async function POST(req: Request) {
   try {
@@ -89,6 +62,15 @@ export async function POST(req: Request) {
     const { topic } = body;
     if (!topic || typeof topic !== 'string' || topic.trim() === '') {
       return NextResponse.json({ error: 'A course topic is required.' }, { status: 400 });
+    }
+
+    // AI Moderation pre-flight check
+    const moderation = await moderatePrompt(topic);
+    if (moderation.flagged) {
+      return NextResponse.json(
+        { error: `⚠️ Topic flagged: ${moderation.reason || 'violates content safety policies'}.` },
+        { status: 400 }
+      );
     }
 
     // 3. Call generateObject to structure the course syllabus outline and select icon
@@ -167,7 +149,10 @@ export async function POST(req: Request) {
       Sentry.captureException(deductError);
     } else {
       console.log(`Deducted 2 credits for user ${user.id} course generation.`);
+      (revalidateTag as any)(`profile-${user.id}`);
     }
+
+    (revalidateTag as any)(`courses-${user.id}`);
 
     return NextResponse.json({
       success: true,

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createClient as createSupabaseServerClient } from '@/utils/supabase/server';
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js';
+import { revalidateTag } from 'next/cache';
 
 export async function POST(req: Request) {
   try {
@@ -88,6 +89,7 @@ export async function POST(req: Request) {
     }
 
     console.log(`Successfully verified payment for user ${user.id} and added 100 credits (New Total: ${newCredits}).`);
+    (revalidateTag as any)(`profile-${user.id}`);
 
     return NextResponse.json({ success: true, newCredits });
   } catch (error: any) {

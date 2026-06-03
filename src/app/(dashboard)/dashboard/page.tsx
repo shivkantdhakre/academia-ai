@@ -3,8 +3,7 @@ import { redirect } from 'next/navigation';
 import * as Icons from 'lucide-react';
 import Link from 'next/link';
 import { TrackClick } from '@/components/TrackClick';
-
-export const revalidate = 0; // Disable static caching to fetch fresh database entries
+import { getCachedCourses, getCachedProfile } from '@/utils/cache';
 
 type IconName = keyof typeof Icons;
 
@@ -17,22 +16,9 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  // 2. Fetch user profile & courses
-  const { data: profile } = await (supabase as any)
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-
-  const { data: courses, error } = await supabase
-    .from('courses')
-    .select('*')
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    console.error('Failed to fetch courses:', error);
-    throw new Error('Failed to load dashboard data. Please try again later.');
-  }
+  // 2. Fetch user profile & courses from cache
+  const profile = await getCachedProfile(user.id);
+  const courses = await getCachedCourses(user.id);
 
   const activeCourses = (courses as any[]) || [];
   const totalCourses = activeCourses.length;

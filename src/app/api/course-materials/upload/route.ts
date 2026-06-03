@@ -1,40 +1,6 @@
 import { NextResponse } from 'next/server';
-import { google } from '@/utils/google';
-import { embed } from 'ai';
-
 import { createClient } from '@/utils/supabase/server';
-
-function chunkText(text: string, chunkSize: number = 800, overlap: number = 100): string[] {
-  const chunks: string[] = [];
-  if (!text) return chunks;
-
-  let startIndex = 0;
-  while (startIndex < text.length) {
-    let endIndex = startIndex + chunkSize;
-    
-    // Don't slice in the middle of a word; find the nearest space
-    if (endIndex < text.length) {
-      const spaceIndex = text.lastIndexOf(' ', endIndex);
-      if (spaceIndex > startIndex) {
-        endIndex = spaceIndex;
-      }
-    }
-    
-    const chunk = text.slice(startIndex, endIndex).trim();
-    if (chunk) {
-      chunks.push(chunk);
-    }
-    
-    // Move starting index back by the overlap amount (ensuring forward progress)
-    const nextIndex = endIndex - overlap;
-    if (nextIndex <= startIndex) {
-      startIndex = endIndex;
-    } else {
-      startIndex = nextIndex;
-    }
-  }
-  return chunks;
-}
+import { inngest } from '@/utils/inngest';
 
 export async function POST(req: Request) {
   try {
@@ -46,21 +12,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 2. Parse request parameters
-    let body;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    const contentType = req.headers.get('content-type') || '';
+    let course_id = '';
+    let text = '';
+    let file: File | null = null;
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      course_id = formData.get('course_id') as string;
+      file = formData.get('file') as File;
+    } else {
+      let body;
+      try {
+        body = await req.json();
+      } catch {
+        return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      }
+      course_id = body.course_id;
+      text = body.text;
     }
 
-    const { course_id, text } = body;
-
-    if (!course_id || !text) {
-      return NextResponse.json({ error: 'Missing course_id or text content.' }, { status: 400 });
+    if (!course_id) {
+      return NextResponse.json({ error: 'Missing course_id.' }, { status: 400 });
     }
 
-    // 3. Verify user owns the course
+    if (!text && !file) {
+      return NextResponse.json({ error: 'Missing text content or file.' }, { status: 400 });
+    }
+
+    // 2. Verify user owns the course
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('id')
@@ -72,49 +52,93 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Course not found or unauthorized' }, { status: 404 });
     }
 
-    // 4. Split text into chunks
-    const chunks = chunkText(text);
-    if (chunks.length === 0) {
-      return NextResponse.json({ error: 'Text content is too short or empty.' }, { status: 400 });
+    let uploadData: any = null;
+    let filePath: string | null = null;
+
+    if (file) {
+      // Handle file upload
+      const fileExt = file.name.split('.').pop() || '';
+      const allowedExts = ['pdf', 'txt', 'md'];
+      if (!allowedExts.includes(fileExt.toLowerCase())) {
+        return NextResponse.json({ error: 'Only PDF, TXT, or MD files are supported.' }, { status: 400 });
+      }
+
+      const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+      filePath = `${user.id}/${course_id}/${Date.now()}_${safeName}`;
+      
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+      // Upload to storage
+      const { error: storageError } = await supabase.storage
+        .from('course-materials')
+        .upload(filePath, fileBuffer, {
+          contentType: file.type,
+          upsert: false
+        });
+
+      if (storageError) {
+        console.error('Supabase Storage upload error:', storageError);
+        return NextResponse.json({ error: `Failed to upload file to storage: ${storageError.message}` }, { status: 500 });
+      }
+
+      // Create upload tracking record
+      const { data, error: uploadDbError } = await (supabase as any)
+        .from('course_materials_uploads')
+        .insert({
+          course_id,
+          filename: file.name,
+          status: 'processing',
+        })
+        .select('id')
+        .single();
+
+      if (uploadDbError || !data) {
+        console.error('Failed to create upload record:', uploadDbError);
+        return NextResponse.json({ error: 'Failed to create upload tracking record' }, { status: 500 });
+      }
+      uploadData = data;
+    } else {
+      // Handle text upload
+      if (text.trim().length < 10) {
+        return NextResponse.json({ error: 'Pasted text must be at least 10 characters long.' }, { status: 400 });
+      }
+
+      // Create upload tracking record
+      const { data, error: uploadDbError } = await (supabase as any)
+        .from('course_materials_uploads')
+        .insert({
+          course_id,
+          filename: 'Pasted Notes',
+          status: 'processing',
+        })
+        .select('id')
+        .single();
+
+      if (uploadDbError || !data) {
+        console.error('Failed to create upload record:', uploadDbError);
+        return NextResponse.json({ error: 'Failed to create upload tracking record' }, { status: 500 });
+      }
+      uploadData = data;
     }
 
-    // 5. Generate embeddings and save in database
-    const materialsToInsert: any[] = [];
-    
-    for (const chunk of chunks) {
-      const { embedding } = await embed({
-        model: google.textEmbeddingModel('gemini-embedding-2'),
-        value: chunk,
-        providerOptions: {
-          google: {
-            outputDimensionality: 768,
-          },
-        },
-      });
-
-      materialsToInsert.push({
+    // 3. Trigger Inngest background event
+    await inngest.send({
+      name: 'course/material.process',
+      data: {
         course_id,
-        content: chunk,
-        embedding,
-      });
-    }
+        upload_id: uploadData.id,
+        text: text ? text.trim() : undefined,
+        filePath: filePath || undefined,
+      },
+    });
 
-    // Bulk insert chunks
-    const { error: insertError } = await (supabase as any)
-      .from('course_materials')
-      .insert(materialsToInsert);
-
-    if (insertError) {
-      console.error('Failed to save course materials:', insertError);
-      return NextResponse.json({ error: 'Failed to save course materials in database' }, { status: 500 });
-    }
-
-    return NextResponse.json({ 
-      success: true, 
-      chunksCount: chunks.length 
+    return NextResponse.json({
+      success: true,
+      uploadId: uploadData.id,
+      status: 'processing',
     });
   } catch (error: any) {
-    console.error('Upload Error:', error);
-    return NextResponse.json({ error: error.message || 'Failed to process document upload' }, { status: 500 });
+    console.error('Upload Endpoint Error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to initiate upload processing' }, { status: 500 });
   }
 }
