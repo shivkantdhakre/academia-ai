@@ -51,7 +51,7 @@ export default function PricingClient({ userEmail, userId }: PricingClientProps)
         }
       };
 
-      const rzp = new (window as any).Razorpay(options);
+      const rzp = new window.Razorpay(options);
       
       rzp.on('payment.failed', function (response: any) {
         alert(`Subscription Payment Failed: ${response.error.description}`);
@@ -130,7 +130,7 @@ export default function PricingClient({ userEmail, userId }: PricingClientProps)
         }
       };
 
-      const rzp = new (window as any).Razorpay(options);
+      const rzp = new window.Razorpay(options);
 
       rzp.on('payment.failed', function (response: any) {
         alert(`Credit Purchase Failed: ${response.error.description}`);

@@ -57,6 +57,25 @@ export async function POST(req: Request) {
       serviceRoleKey
     );
 
+    // Idempotency check: attempt to record this order. If it fails with PG code 23505 (unique violation),
+    // it means this order has already been successfully processed and credited.
+    const { error: insertOrderError } = await supabaseAdmin
+      .from('processed_orders')
+      .insert({
+        order_id: razorpay_order_id,
+        user_id: user.id,
+        payment_id: razorpay_payment_id,
+      });
+
+    if (insertOrderError) {
+      if (insertOrderError.code === '23505') {
+        console.warn(`Replay attack or duplicate processing prevented for order_id: ${razorpay_order_id}`);
+        return NextResponse.json({ error: 'This payment order has already been processed.' }, { status: 409 });
+      }
+      console.error('Failed to record processed order:', insertOrderError);
+      return NextResponse.json({ error: 'Failed to record transaction' }, { status: 500 });
+    }
+
     // Fetch existing credits
     const { data: profile, error: fetchError } = await supabaseAdmin
       .from('profiles')

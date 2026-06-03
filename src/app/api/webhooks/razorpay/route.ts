@@ -67,6 +67,76 @@ export async function POST(req: Request) {
         console.warn('Subscription webhook payload missing user_id note:', subscription.id);
       }
     }
+    // 3. Handle the One-Time Payment Order Paid Event (Network Dropout Fallback)
+    else if (event.event === 'order.paid') {
+      const order = event.payload.order.entity;
+      const payment = event.payload.payment?.entity;
+      const userId = order.notes?.user_id;
+      const orderId = order.id;
+
+      if (userId && orderId) {
+        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!serviceRoleKey) {
+          console.error('Missing SUPABASE_SERVICE_ROLE_KEY.');
+          return NextResponse.json({ error: 'Database service unavailable' }, { status: 500 });
+        }
+
+        const supabaseAdmin = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          serviceRoleKey
+        );
+
+        // Idempotency check: attempt to record this order. If it fails with PG code 23505 (unique violation),
+        // it means this order was already processed and credited by the client-side verify endpoint.
+        const { error: insertOrderError } = await supabaseAdmin
+          .from('processed_orders')
+          .insert({
+            order_id: orderId,
+            user_id: userId,
+            payment_id: payment?.id || null,
+          });
+
+        if (insertOrderError) {
+          if (insertOrderError.code === '23505') {
+            console.log(`Webhook Fallback: Order ${orderId} already processed by client. Webhook skipped.`);
+            return NextResponse.json({ status: 'ok', message: 'Already processed' });
+          }
+          console.error('Webhook failed to record processed order:', insertOrderError);
+          return NextResponse.json({ error: 'Failed to record transaction' }, { status: 500 });
+        }
+
+        // Fetch user profile credits
+        const { data: profile, error: fetchError } = await supabaseAdmin
+          .from('profiles')
+          .select('ai_credits_remaining')
+          .eq('id', userId)
+          .single();
+
+        if (fetchError || !profile) {
+          console.error('Webhook failed to fetch profile for fallback:', fetchError);
+          return NextResponse.json({ error: 'Profile not found' }, { status: 500 });
+        }
+
+        const currentCredits = profile.ai_credits_remaining ?? 0;
+        const newCredits = currentCredits + 100;
+
+        const { error: updateError } = await supabaseAdmin
+          .from('profiles')
+          .update({ 
+            ai_credits_remaining: newCredits 
+          })
+          .eq('id', userId);
+
+        if (updateError) {
+          console.error('Webhook fallback failed to update credits:', updateError);
+          return NextResponse.json({ error: 'Failed to update credits' }, { status: 500 });
+        }
+
+        console.log(`Webhook Fallback: Successfully credited 100 AI credits to user ${userId} for order ${orderId}.`);
+      } else {
+        console.warn('Order paid event missing user_id note or order_id:', orderId);
+      }
+    }
 
     return NextResponse.json({ status: 'ok' });
   } catch (error: any) {

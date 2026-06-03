@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server';
-import PricingClient from './PricingClient';
+import PricingClient from '@/app/(dashboard)/pricing/PricingClient';
 
 export default async function PricingPage() {
   const supabase = await createClient();
